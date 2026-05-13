@@ -21,10 +21,6 @@ def multi_sha1_base64(input_str, iterations=10):
 def generate_hashes(event=None):
     user_input = entry_input.get()
 
-    if not user_input:
-        messagebox.showwarning("警告", "請先輸入要處理的字串！")
-        return
-
     # 計算結果
     full_result = multi_sha1_base64(user_input)
     short_result = str(full_result[18:28])  # 截取 18:28 的字元

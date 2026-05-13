@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SHA-1 + Base64 多重轉換工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f2f2f7;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 90vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 480px;
+            box-sizing: border-box;
+        }
+        h2 { margin-top: 0; color: #1c1c1e; font-size: 22px; }
+        label { display: block; margin-top: 18px; color: #3a3a3c; font-size: 15px; font-weight: 600; }
+        
+        /* font-size 設為 16px 是 iOS Safari 不會自動放大的關鍵 */
+        input[type="text"] {
+            width: 100%;
+            padding: 14px;
+            margin-top: 6px;
+            border: 1.5px solid #c7c7cc;
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus { border-color: #007aff; }
+        
+        button {
+            background-color: #007aff;
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+        button:active { background-color: #0062cc; }
+        
+        .result-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .result-group input { margin-top: 0; background-color: #f2f2f7; color: #1c1c1e; }
+        
+        .btn-copy {
+            background-color: #34c759;
+            width: auto;
+            margin-top: 0;
+            white-space: nowrap;
+            padding: 0 20px;
+        }
+        .btn-copy:active { background-color: #2bb34b; }
+        
+        .status { 
+            margin-top: 20px; 
+            font-size: 14px; 
+            color: #8e8e93; 
+            text-align: center; 
+            min-height: 20px; 
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>SHA-1 + Base64 轉換工具</h2>
+    
+    <label for="userInput">請輸入要處理的字串:</label>
+    <input type="text" id="userInput" placeholder="輸入後直接按 Enter 執行..." autofocus>
+    
+    <button id="btnRun">執行計算 (10次哈希)</button>
+    
+    <label>完整輸出:</label>
+    <div class="result-group">
+        <input type="text" id="resultFull" readonly>
+        <button class="btn-copy" onclick="copyResult('resultFull', '「完整輸出」')">複製</button>
+    </div>
+    
+    <label>截取輸出 (18:28):</label>
+    <div class="result-group">
+        <input type="text" id="resultShort" readonly>
+        <button class="btn-copy" onclick="copyResult('resultShort', '「截取輸出」')">複製</button>
+    </div>
+    
+    <div class="status" id="statusText">請輸入字串並點擊計算或按 Enter。</div>
+</div>
+
+<script>
+    // 將二進位 ArrayBuffer 轉換為 Base64 字串
+    function arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+    }
+
+    // 核心運算邏輯：完美對應 Python sha1.digest() 傳遞原始 Bytes
+    async function multiSha1Base64(inputStr, iterations = 10) {
+        const encoder = new TextEncoder();
+        let currentData = encoder.encode(inputStr); // 轉換為 Uint8Array
+        
+        for (let i = 0; i < iterations; i++) {
+            // 每次 digest 都產生原始的 20 bytes 二進位緩衝區
+            const buffer = await crypto.subtle.digest('SHA-1', currentData);
+            currentData = new Uint8Array(buffer);
+        }
+        
+        return arrayBufferToBase64(currentData);
+    }
+
+    const userInput = document.getElementById('userInput');
+    const btnRun = document.getElementById('btnRun');
+    const resultFull = document.getElementById('resultFull');
+    const resultShort = document.getElementById('resultShort');
+    const statusText = document.getElementById('statusText');
+
+    async function runCalculation() {
+        const text = userInput.value;
+        if (!text) {
+            alert("請先輸入要處理的字串！");
+            return;
+        }
+
+        statusText.textContent = "計算中...";
+        statusText.style.color = "#8e8e93";
+
+        try {
+            const fullStr = await multiSha1Base64(text, 10);
+            const shortStr = fullStr.substring(18, 28); // 切片截取 18~28
+
+            resultFull.value = fullStr;
+            resultShort.value = shortStr;
+
+            // 預設自動複製完整輸出至 iPad 剪貼簿
+            await copyToClipboard(fullStr);
+            statusText.textContent = "計算完成！已自動複製「完整輸出」。";
+            statusText.style.color = "#007aff";
+        } catch (err) {
+            console.error(err);
+            statusText.textContent = "發生錯誤，請確認瀏覽器支援 Web Crypto。";
+            statusText.style.color = "#ff3b30";
+        }
+    }
+
+    // 跨瀏覽器相容的剪貼簿寫入函式
+    async function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            // 舊版 iOS 備用方案
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand("copy");
+            textArea.remove();
+        }
+    }
+
+    // 綁定執行按鈕
+    btnRun.addEventListener('click', runCalculation);
+
+    // 綁定 Enter 鍵觸發
+    userInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            runCalculation();
+        }
+    });
+
+    // 手動複製按鈕觸發函式
+    async function copyResult(elementId, labelName) {
+        const inputEl = document.getElementById(elementId);
+        if (!inputEl.value) {
+            alert("沒有可複製的內容，請先執行計算！");
+            return;
+        }
+        await copyToClipboard(inputEl.value);
+        statusText.textContent = `已成功手動複製 ${labelName}！`;
+        statusText.style.color = "#34c759";
+    }
+</script>
+</body>
+</html>
