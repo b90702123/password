@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 ndarr = np.array([3, 8, -7, 1, 0])
 print(ndarr)
